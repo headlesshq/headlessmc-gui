@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import CommandForm from '../components/CommandForm.vue'
 import ModalDialog from '../components/ModalDialog.vue'
+import PlatformLogo from '../components/PlatformLogo.vue'
 import { api } from '../lib/api'
 import { useData } from '../lib/useData'
 
@@ -35,7 +36,12 @@ function addProfile(id: string) {
       </thead>
       <tbody>
         <tr v-for="version in data" :key="version.id">
-          <td class="mono">{{ version.id }}</td>
+          <td>
+            <span class="name">
+              <PlatformLogo :platform="version.platform" />
+              <span class="mono">{{ version.id }}</span>
+            </span>
+          </td>
           <td class="mono">{{ version.inheritsFrom ?? '' }}</td>
           <td>{{ version.type ?? '' }}</td>
           <td class="actions"><button class="small" @click="addProfile(version.id)">Add profile</button></td>
@@ -61,6 +67,12 @@ function addProfile(id: string) {
 </template>
 
 <style scoped>
+.name {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .toolbar {
   margin-bottom: 1rem;
 }

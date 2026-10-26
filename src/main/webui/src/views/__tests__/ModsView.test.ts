@@ -9,6 +9,7 @@ const profile = {
   side: 'client',
   version: 'neoforge 26.3',
   currentVersion: 'neoforge 26.3',
+  platform: 'neoforge',
   path: '/mc',
   javaVersion: null,
   patchers: [],

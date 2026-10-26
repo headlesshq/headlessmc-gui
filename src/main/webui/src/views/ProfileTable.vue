@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import PlatformLogo from '../components/PlatformLogo.vue'
 import type { Profile } from '../lib/types'
 
 defineProps<{ profiles: Profile[] }>()
@@ -21,7 +22,10 @@ const expanded = ref<string | null>(null)
       <template v-for="profile in profiles" :key="profile.name">
         <tr>
           <td>
-            <a href="#" @click.prevent="expanded = expanded === profile.name ? null : profile.name">{{ profile.name }}</a>
+            <span class="name">
+              <PlatformLogo :platform="profile.platform" />
+              <a href="#" @click.prevent="expanded = expanded === profile.name ? null : profile.name">{{ profile.name }}</a>
+            </span>
           </td>
           <td class="mono">{{ profile.currentVersion }}</td>
           <td>{{ profile.javaVersion ?? 'auto' }}</td>
@@ -55,6 +59,12 @@ const expanded = ref<string | null>(null)
 </template>
 
 <style scoped>
+.name {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .details th,
 .details td {
   border: none;

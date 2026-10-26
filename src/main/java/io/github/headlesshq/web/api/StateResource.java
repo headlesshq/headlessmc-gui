@@ -14,7 +14,9 @@ import io.github.headlesshq.headlessmc.java.JavaService;
 import io.github.headlesshq.headlessmc.launcher.profile.Profile;
 import io.github.headlesshq.headlessmc.launcher.profile.ProfileService;
 import io.github.headlesshq.headlessmc.launcher.server.ServerService;
+import io.github.headlesshq.headlessmc.platform.client.VersionMatcherService;
 import io.github.headlesshq.headlessmc.version.Version;
+import io.github.headlesshq.headlessmc.version.arg.VersionArg;
 import io.github.headlesshq.headlessmc.version.service.VersionJsonService;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;
@@ -38,6 +40,7 @@ public class StateResource {
 
     private final ConfigDescriptionService configDescriptionService;
     private final LastUsedAccountService lastUsedAccountService;
+    private final VersionMatcherService versionMatcherService;
     private final VersionJsonService versionJsonService;
     private final ProfileService profileService;
     private final ServerService serverService;
@@ -51,6 +54,7 @@ public class StateResource {
     public StateResource(
         ConfigDescriptionService configDescriptionService,
         LastUsedAccountService lastUsedAccountService,
+        VersionMatcherService versionMatcherService,
         VersionJsonService versionJsonService,
         ProfileService profileService,
         ServerService serverService,
@@ -62,6 +66,7 @@ public class StateResource {
     ) {
         this.configDescriptionService = configDescriptionService;
         this.lastUsedAccountService = lastUsedAccountService;
+        this.versionMatcherService = versionMatcherService;
         this.versionJsonService = versionJsonService;
         this.profileService = profileService;
         this.serverService = serverService;
@@ -143,9 +148,25 @@ public class StateResource {
     @Path("/versions")
     public List<VersionDto> versions() {
         return versionJsonService.getInstalledVersions().stream()
-            .map(version -> new VersionDto(version.getId(), version.getInheritsFrom(), version.getType()))
+            .map(version -> new VersionDto(version.getId(), version.getInheritsFrom(), version.getType(), platform(version)))
             .sorted(Comparator.comparing(VersionDto::id, String.CASE_INSENSITIVE_ORDER))
             .toList();
+    }
+
+    /**
+     * @return the platform an installed version runs on, a modding platform is preferred
+     * over vanilla, or {@code null} if no platform matches the version.
+     */
+    private @Nullable String platform(Version version) {
+        try {
+            return versionMatcherService.match(version, versionJsonService).stream()
+                .map(id -> id.getPlatform().getName())
+                .min(Comparator.comparing(VersionArg.PLATFORM_VANILLA::equals))
+                .orElse(null);
+        } catch (RuntimeException e) {
+            LOG.debugf(e, "Failed to match platform of version %s", version.getId());
+            return null;
+        }
     }
 
     @GET
@@ -199,6 +220,7 @@ public class StateResource {
         String side,
         String version,
         String currentVersion,
+        String platform,
         String path,
         @Nullable Integer javaVersion,
         List<String> patchers,
@@ -213,6 +235,7 @@ public class StateResource {
                 profile.side().name().toLowerCase(),
                 profile.version().toString(" "),
                 profile.currentVersion().toString(" "),
+                profile.currentVersion().platform(),
                 profile.path().toAbsolutePath().toString(),
                 profile.javaVersion(),
                 profile.patchers(),
@@ -224,7 +247,7 @@ public class StateResource {
         }
     }
 
-    public record VersionDto(String id, @Nullable String inheritsFrom, @Nullable String type) {
+    public record VersionDto(String id, @Nullable String inheritsFrom, @Nullable String type, @Nullable String platform) {
     }
 
     public record JavaDto(String name, int version, String home, boolean current) {

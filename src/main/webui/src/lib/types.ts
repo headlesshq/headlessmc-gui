@@ -158,6 +158,8 @@ export interface Profile {
   side: 'client' | 'server'
   version: string
   currentVersion: string
+  /** the platform the version runs on, e.g. vanilla, fabric or paper */
+  platform: string
   path: string
   javaVersion: number | null
   patchers: string[]
@@ -171,6 +173,8 @@ export interface InstalledVersion {
   id: string
   inheritsFrom: string | null
   type: string | null
+  /** the platform the version runs on, null if HeadlessMc does not recognize the version */
+  platform: string | null
 }
 
 export interface JavaInstallation {
