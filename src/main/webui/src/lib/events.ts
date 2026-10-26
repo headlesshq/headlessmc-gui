@@ -1,5 +1,7 @@
 // Websocket client for the server sent events (/ws/events), reconnects automatically.
 
+import { backendOrigin, backendUrl } from './backend'
+
 export interface ServerEvent {
   type: string
   payload: unknown
@@ -66,7 +68,10 @@ export class EventClient {
   }
 }
 
-export function eventsUrl(location: Location = window.location): string {
+export function eventsUrl(location: Location = window.location, origin: string | undefined = backendOrigin()): string {
+  if (origin) {
+    return backendUrl('/ws/events', origin.replace(/^http/, 'ws'))
+  }
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
   return `${protocol}//${location.host}/ws/events`
 }

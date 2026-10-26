@@ -14,6 +14,7 @@ import type {
   Profile,
   RemoteMod,
 } from './types'
+import { backendUrl } from './backend'
 
 export class ApiError extends Error {
   constructor(
@@ -26,7 +27,7 @@ export class ApiError extends Error {
 
 async function request<T>(method: string, url: string, body?: unknown): Promise<T> {
   const form = body instanceof FormData
-  const response = await fetch(url, {
+  const response = await fetch(backendUrl(url), {
     method,
     headers: body === undefined || form ? undefined : { 'Content-Type': 'application/json' },
     body: body === undefined ? undefined : form ? body : JSON.stringify(body),
@@ -66,7 +67,7 @@ export const api = {
   mods: (profile: string, type?: string) =>
     request<ModsListing>('GET', `/api/mods/${encodeURIComponent(profile)}${type ? `?type=${encodeURIComponent(type)}` : ''}`),
   modLogoUrl: (profile: string, file: ModFile) =>
-    `/api/mods/${encodeURIComponent(profile)}/logo?path=${encodeURIComponent(file.path)}&v=${file.modified}`,
+    backendUrl(`/api/mods/${encodeURIComponent(profile)}/logo?path=${encodeURIComponent(file.path)}&v=${file.modified}`),
   addMods: (profile: string, type: string, files: File[], world?: string | null, overwrite = false) => {
     const form = new FormData()
     files.forEach((file) => form.append('files', file, file.name))

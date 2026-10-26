@@ -11,6 +11,8 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
+    // the Tauri app (Rust sources and build output) is not part of the web ui
+    watch: { ignored: ['**/src-tauri/**'] },
     proxy: {
       '/api': backend,
       '/ws': { target: backend.replace(/^http/, 'ws'), ws: true },

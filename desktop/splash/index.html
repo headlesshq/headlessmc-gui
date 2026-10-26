@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HeadlessMc</title>
+  <style>
+    :root {
+      --bg: #16181d;
+      --fg: #e6e8eb;
+      --muted: #9aa0a6;
+      --accent: #2f855a;
+      --error: #f56565;
+    }
+
+    html, body {
+      height: 100%;
+      margin: 0;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      font-size: 14px;
+    }
+
+    main {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      padding: 0 16px;
+      box-sizing: border-box;
+      text-align: center;
+    }
+
+    .spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid #2a2e36;
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    #status { color: var(--muted); }
+
+    #error {
+      display: none;
+      max-width: 640px;
+      color: var(--error);
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: ui-monospace, monospace;
+      font-size: 12px;
+    }
+
+    body.failed .spinner { display: none; }
+    body.failed #error { display: block; }
+  </style>
+</head>
+<body>
+<main>
+  <img src="logo.svg" width="96" height="96" alt="" aria-hidden="true">
+  <div class="spinner"></div>
+  <div id="status">Starting HeadlessMc…</div>
+  <div id="error"></div>
+</main>
+<script>
+  /** Called by the desktop app when the backend could not be started. */
+  window.showError = (message) => {
+    document.body.classList.add('failed')
+    document.getElementById('status').textContent = 'HeadlessMc failed to start'
+    document.getElementById('error').textContent = message
+  }
+</script>
+</body>
+</html>

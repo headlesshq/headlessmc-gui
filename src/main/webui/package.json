@@ -9,13 +9,15 @@
     "preview": "vite preview",
     "typecheck": "vue-tsc --noEmit",
     "test": "vitest run",
-    "test:integration": "vitest run --config vitest.integration.config.ts"
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "tauri": "tauri"
   },
   "dependencies": {
     "vue": "^3.5.43",
     "vue-router": "^5.3.1"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "2.12.2",
     "@types/node": "^24.0.0",
     "@vitejs/plugin-vue": "^6.0.9",
     "@vue/test-utils": "^2.5.1",

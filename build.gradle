@@ -1,6 +1,6 @@
 plugins {
     id 'java'
-    id 'io.quarkus' version "${quarkusVersion}"
+    alias(hmcLibs.plugins.quarkus)
 }
 
 group = 'io.github.headlesshq'
@@ -10,13 +10,25 @@ repositories {
     mavenCentral()
 }
 
+def quarkusVersion = hmcLibs.versions.quarkus.get()
+def hmcVersion = new Properties().with { props ->
+    file('headlessmc/gradle.properties').withInputStream { props.load(it) }
+    props.getProperty('version')
+}
+
 configurations.configureEach {
     // The jline progressbar draws to the server's terminal, the web layer provides its own ProgressbarService.
     exclude group: 'io.github.headlesshq', module: 'headlessmc-progressbar-jline'
+    // The enforced Quarkus BOM pins an older org.jline:jline than HeadlessMc's other jline modules, a strict constraint conflicts with it.
+    resolutionStrategy.eachDependency {
+        if (it.requested.group == 'org.jline') {
+            it.useVersion(hmcLibs.versions.jline.get())
+        }
+    }
 }
 
 dependencies {
-    implementation enforcedPlatform("io.quarkus.platform:quarkus-bom:${quarkusVersion}")
+    implementation enforcedPlatform(hmcLibs.quarkus)
     implementation 'io.quarkus:quarkus-arc'
     implementation 'io.quarkus:quarkus-rest'
     implementation 'io.quarkus:quarkus-rest-jackson'
@@ -42,10 +54,13 @@ dependencies {
     implementation "io.github.headlesshq:headlessmc-platform:${hmcVersion}"
     implementation "io.github.headlesshq:headlessmc-test:${hmcVersion}"
     implementation "io.github.headlesshq:headlessmc-config:${hmcVersion}"
+    implementation "io.github.headlesshq:headlessmc-java-args:${hmcVersion}"
     implementation "io.github.headlesshq:headlessmc-java-launcher:${hmcVersion}"
-    implementation 'info.picocli:picocli:4.7.7'
-    implementation 'org.jline:jline:4.4.6' // keep aligned with headlessmc, used to parse lines like HeadlessMc does
-    implementation 'org.jspecify:jspecify:1.0.1'
+    implementation "io.github.headlesshq:headlessmc-java-sources:${hmcVersion}"
+    implementation "io.github.headlesshq:headlessmc-java-version:${hmcVersion}"
+    implementation hmcLibs.picocli
+    implementation hmcLibs.jline // used to parse lines like HeadlessMc does
+    implementation hmcLibs.jspecify
 
     // Depending on projects of the included headlessmc build (which apply the io.quarkus plugin themselves)
     // makes the Quarkus Gradle plugin drop the 'conditional-dev-dependencies' of the extensions in dev mode,
@@ -77,12 +92,47 @@ test {
     systemProperty 'quarkus.quinoa.enabled', 'false'
 }
 
+// -Pdesktop builds the desktop app (src/main/webui/src-tauri): a native image of this app as Tauri sidecar,
+// and the installers. Quinoa's Tauri mode makes Tauri serve the ui, instead of Quarkus.
+// Quinoa (2.9.3) does not bundle the sidecar and run the Tauri CLI itself: it copies the native image before the native
+// image is built, so the app would get a stale or no backend, it runs `npm run tauri -- tauri build`, and it ignores
+// quarkus.quinoa.tauri.managed=false. With only the web export target it keeps the Tauri mode but does neither.
+if (providers.gradleProperty('desktop').present) {
+    quarkus {
+        set('native.enabled', 'true')
+        set('package.jar.enabled', 'false')
+        set('quinoa.tauri.enabled', 'true')
+        set('quinoa.tauri.export', 'web')
+        set('quinoa.tauri.build-native-image', 'false')
+    }
+
+    def windows = System.getProperty('os.name').toLowerCase().contains('windows')
+    def webui = layout.projectDirectory.dir('src/main/webui')
+    def runner = layout.buildDirectory.file("${project.name}-${project.version}-runner${windows ? '.exe' : ''}")
+    def targetTriple = providers.exec { commandLine 'rustc', '--print', 'host-tuple' }.standardOutput.asText.map { it.trim() }
+
+    def tauriSidecar = tasks.register('tauriSidecar', Copy) {
+        dependsOn tasks.named('quarkusBuild')
+        from runner
+        into webui.dir('src-tauri/binaries')
+        rename { "quarkus-backend-${targetTriple.get()}${windows ? '.exe' : ''}" }
+    }
+
+    def tauriBuild = tasks.register('tauriBuild', Exec) {
+        dependsOn tauriSidecar
+        workingDir webui
+        commandLine windows ? ['cmd', '/c', 'npm', 'run', 'tauri', 'build'] : ['npm', 'run', 'tauri', 'build']
+    }
+
+    tasks.named('build') { dependsOn tauriBuild }
+}
+
 // Quinoa builds the frontend during the Quarkus build, but Gradle does not know about the frontend sources:
 // without these inputs, frontend-only changes leave quarkusBuild UP-TO-DATE and the jar keeps the old frontend.
 ['quarkusAppPartsBuild', 'quarkusBuild'].each { name ->
     tasks.named(name) {
         inputs.files(fileTree('src/main/webui') {
-            exclude 'node_modules/**', 'dist/**', '**/__tests__/**', 'src/integration/**'
+            exclude 'node_modules/**', 'dist/**', 'src-tauri/target/**', 'src-tauri/gen/**', 'src-tauri/binaries/**', '**/__tests__/**', 'src/integration/**'
         }).withPropertyName('webui').withPathSensitivity(PathSensitivity.RELATIVE)
     }
 }

@@ -7,3 +7,6 @@ HeadlessMC/
 node_modules/
 src/main/webui/dist/
 src/main/webui/node_modules/
+src/main/webui/src-tauri/target/
+src/main/webui/src-tauri/gen/
+src/main/webui/src-tauri/binaries/

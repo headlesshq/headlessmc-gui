@@ -26,7 +26,7 @@ const busyJob = computed(() => Object.values(store.jobs).find((job) => !isDone(j
 <template>
   <div class="layout">
     <nav class="sidebar">
-      <div class="brand">HeadlessMc</div>
+      <div class="brand"><img src="/favicon.svg" alt="" class="brand-logo" />HeadlessMc</div>
       <RouterLink v-for="item in nav" :key="item.to" :to="item.to" class="nav-link">
         {{ item.label }}
         <span v-if="item.to === '/processes' && runningProcesses" class="badge ok">{{ runningProcesses }}</span>
@@ -64,10 +64,18 @@ const busyJob = computed(() => Object.values(store.jobs).find((job) => !isDone(j
 }
 
 .brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   font-weight: 700;
   font-size: 1.1rem;
   padding: 0 0.6rem 1rem;
   color: var(--accent);
+}
+
+.brand-logo {
+  width: 28px;
+  height: 28px;
 }
 
 .nav-link {
