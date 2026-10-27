@@ -33,7 +33,6 @@ const busyJob = computed(() => Object.values(store.jobs).find((job) => !isDone(j
       </RouterLink>
       <div class="status">
         <div v-if="busyJob" class="busy mono" :title="busyJob.line">▶ {{ busyJob.line }}</div>
-        <div :class="store.connected ? 'online' : 'offline'">{{ store.connected ? '● connected' : '○ disconnected' }}</div>
       </div>
     </nav>
     <main class="content">
@@ -115,14 +114,6 @@ const busyJob = computed(() => Object.values(store.jobs).find((job) => !isDone(j
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.online {
-  color: var(--accent);
-}
-
-.offline {
-  color: var(--danger);
 }
 
 .content {
