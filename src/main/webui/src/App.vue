@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { RouterLink, RouterView } from 'vue-router'
 import AccountMenu from './components/AccountMenu.vue'
 import ProgressPanel from './components/ProgressPanel.vue'
 import PromptDialog from './components/PromptDialog.vue'
+import SettingsDialog from './components/SettingsDialog.vue'
 import { isDone, store } from './lib/store'
 
 const nav = [
@@ -13,7 +14,6 @@ const nav = [
   { to: '/servers', label: 'Servers' },
   { to: '/mods', label: 'Mods' },
   { to: '/java', label: 'Java' },
-  { to: '/config', label: 'Config' },
   { to: '/processes', label: 'Processes' },
   { to: '/commands', label: 'All commands' },
   { to: '/console', label: 'Console' },
@@ -21,6 +21,7 @@ const nav = [
 
 const runningProcesses = computed(() => Object.values(store.processes).filter((p) => p.status === 'RUNNING').length)
 const busyJob = computed(() => Object.values(store.jobs).find((job) => !isDone(job)))
+const settingsOpen = ref(false)
 </script>
 
 <template>
@@ -33,6 +34,10 @@ const busyJob = computed(() => Object.values(store.jobs).find((job) => !isDone(j
       </RouterLink>
       <div class="status">
         <div v-if="busyJob" class="busy mono" :title="busyJob.line">▶ {{ busyJob.line }}</div>
+        <button class="settings-button" :class="{ active: settingsOpen }" @click="settingsOpen = true">
+          <span class="gear" aria-hidden="true"></span>
+          Settings
+        </button>
       </div>
     </nav>
     <main class="content">
@@ -41,6 +46,7 @@ const busyJob = computed(() => Object.values(store.jobs).find((job) => !isDone(j
       </header>
       <RouterView />
     </main>
+    <SettingsDialog v-if="settingsOpen" @close="settingsOpen = false" />
     <PromptDialog />
     <ProgressPanel />
   </div>
@@ -107,6 +113,38 @@ const busyJob = computed(() => Object.values(store.jobs).find((job) => !isDone(j
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
+}
+
+.settings-button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 -0.6rem;
+  padding: 0.4rem 0.6rem;
+  border: none;
+  background: none;
+  font-size: 0.9rem;
+  color: var(--fg-muted);
+  text-align: left;
+}
+
+.settings-button:hover:not(:disabled),
+.settings-button.active {
+  background: var(--bg-input);
+  color: var(--fg);
+}
+
+.gear {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  background-color: currentColor;
+  mask: url('./assets/icons/gear.svg') center / contain no-repeat;
+  transition: transform 0.3s;
+}
+
+.settings-button:hover .gear {
+  transform: rotate(45deg);
 }
 
 .busy {
