@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { RouterLink, RouterView } from 'vue-router'
+import AccountMenu from './components/AccountMenu.vue'
 import ProgressPanel from './components/ProgressPanel.vue'
 import PromptDialog from './components/PromptDialog.vue'
 import { isDone, store } from './lib/store'
 
 const nav = [
   { to: '/', label: 'Dashboard' },
-  { to: '/accounts', label: 'Accounts' },
   { to: '/versions', label: 'Versions' },
   { to: '/profiles', label: 'Profiles' },
   { to: '/servers', label: 'Servers' },
@@ -37,6 +37,9 @@ const busyJob = computed(() => Object.values(store.jobs).find((job) => !isDone(j
       </div>
     </nav>
     <main class="content">
+      <header class="topbar">
+        <AccountMenu />
+      </header>
       <RouterView />
     </main>
     <PromptDialog />
@@ -123,8 +126,14 @@ const busyJob = computed(() => Object.values(store.jobs).find((job) => !isDone(j
 }
 
 .content {
-  padding: 1.5rem 2rem;
+  padding: 1rem 2rem 1.5rem;
   min-width: 0;
+}
+
+.topbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.25rem;
 }
 
 @media (max-width: 720px) {
