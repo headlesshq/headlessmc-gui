@@ -221,12 +221,23 @@ export interface ModsListing {
   types: string[]
   worlds: string[]
   files: ModFile[]
+  /** the platforms mods can be downloaded from, in the order in which they are offered */
+  platforms: ModPlatform[]
+}
+
+export interface ModPlatform {
+  /** e.g. modrinth, curseforge, github */
+  name: string
+  /** false if the platform needs configuration first, e.g. a CurseForge API key */
+  enabled: boolean
+  /** all mods of platforms with a fixed set of mods (GitHub), shown without searching; null if the platform has to be searched */
+  mods: RemoteMod[] | null
 }
 
 export interface RemoteMod {
   id: string
   name: string
   description: string
-  /** icon on the distribution platform (Modrinth), if the project has one */
+  /** icon on the distribution platform, if the project has one */
   iconUrl: string | null
 }

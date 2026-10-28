@@ -82,10 +82,10 @@ export const api = {
       'POST',
       `/api/mods/${encodeURIComponent(profile)}/files/enabled?path=${encodeURIComponent(path)}&enabled=${enabled}`,
     ),
-  searchMods: (profile: string, type: string, query: string) =>
+  searchMods: (profile: string, type: string, query: string, platform: string) =>
     request<RemoteMod[]>(
       'GET',
-      `/api/mods/${encodeURIComponent(profile)}/search?${new URLSearchParams({ type, query })}`,
+      `/api/mods/${encodeURIComponent(profile)}/search?${new URLSearchParams({ type, query, platform })}`,
     ),
 
   processes: () => request<ProcessInfo[]>('GET', '/api/processes'),

@@ -4,6 +4,7 @@ import io.github.headlesshq.headlessmc.launcher.profile.Profile;
 import io.github.headlesshq.headlessmc.mods.ModType;
 import io.github.headlesshq.web.mods.ModFileDto;
 import io.github.headlesshq.web.mods.ModFilesService;
+import io.github.headlesshq.web.mods.ModPlatformDto;
 import io.github.headlesshq.web.mods.RemoteModDto;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.BadRequestException;
@@ -52,7 +53,8 @@ public class ModsResource {
             type.name(),
             types.stream().map(ModType::name).toList(),
             service.getWorlds(profile),
-            service.list(profile, type)
+            service.list(profile, type),
+            service.platforms(profile, type)
         );
     }
 
@@ -163,7 +165,8 @@ public class ModsResource {
         String type,
         List<String> types,
         List<String> worlds,
-        List<ModFileDto> files
+        List<ModFileDto> files,
+        List<ModPlatformDto> platforms
     ) {
     }
 

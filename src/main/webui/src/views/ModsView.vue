@@ -5,6 +5,7 @@ import JobOutput from '../components/JobOutput.vue'
 import ModCard from '../components/ModCard.vue'
 import ModLogo from '../components/ModLogo.vue'
 import { api, ApiError } from '../lib/api'
+import { CURSEFORGE_API_KEY, CURSEFORGE_TOKEN_URL, modPlatformLogo, modPlatformName, remoteModIcon } from '../lib/modPlatforms'
 import { acceptsFile, typeName } from '../lib/modTypes'
 import { quoteArg } from '../lib/shell'
 import { run, store, waitForJob } from '../lib/store'
@@ -12,6 +13,7 @@ import type { ModFile, ModsListing, Profile, RemoteMod } from '../lib/types'
 import { useData } from '../lib/useData'
 
 const LAST_PROFILE = 'hmc-mods-profile'
+const LAST_PLATFORM = 'hmc-mods-platform'
 const route = useRoute()
 const router = useRouter()
 
@@ -34,18 +36,33 @@ const results = ref<RemoteMod[]>([])
 const searching = ref(false)
 const searchError = ref('')
 const installJobs = ref<Record<string, string>>({})
+const searchPlatform = ref(readStorage(LAST_PLATFORM) ?? '')
+const apiKey = ref('')
+const savingKey = ref(false)
+const keyError = ref('')
+
+function readStorage(key: string): string | null {
+  try {
+    return localStorage.getItem(key)
+  } catch {
+    return null
+  }
+}
+
+function writeStorage(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value)
+  } catch {
+    // storage unavailable
+  }
+}
 
 // select the last used (or first) profile
 watch(
   profiles,
   (available) => {
     if (profile.value || !available.length) return
-    let last: string | null = null
-    try {
-      last = localStorage.getItem(LAST_PROFILE)
-    } catch {
-      // storage unavailable
-    }
+    const last = readStorage(LAST_PROFILE)
     const name = available.find((p) => p.name === last)?.name ?? available[0].name
     router.replace({ query: { profile: name } })
   },
@@ -68,11 +85,7 @@ async function load() {
 }
 
 watch([profile, type], () => {
-  try {
-    if (profile.value) localStorage.setItem(LAST_PROFILE, profile.value)
-  } catch {
-    // storage unavailable
-  }
+  if (profile.value) writeStorage(LAST_PROFILE, profile.value)
   results.value = []
   error.value = ''
   notice.value = ''
@@ -178,14 +191,63 @@ async function remove(file: ModFile) {
   }
 }
 
-// ---- downloading from Modrinth (HeadlessMc's mod add command) ----
+// ---- downloading from Modrinth, CurseForge or GitHub (HeadlessMc's mod add command) ----
+
+const platforms = computed(() => listing.value?.platforms ?? [])
+const platform = computed(
+  () => platforms.value.find((p) => p.name === searchPlatform.value) ?? platforms.value.find((p) => p.enabled) ?? platforms.value[0],
+)
+const platformName = computed(() => (platform.value ? modPlatformName(platform.value.name) : 'the internet'))
+const needsApiKey = computed(() => platform.value?.name === 'curseforge' && !platform.value.enabled)
+const catalog = computed(() => platform.value?.mods ?? null)
+const shownResults = computed(() => {
+  if (!catalog.value) return results.value
+  const text = query.value.trim().toLowerCase()
+  return catalog.value.filter((mod) => !text || [mod.name, mod.description].some((value) => value.toLowerCase().includes(text)))
+})
+
+function selectPlatform(name: string) {
+  if (name === platform.value?.name) return
+  searchPlatform.value = name
+  writeStorage(LAST_PLATFORM, name)
+  results.value = []
+  searchError.value = ''
+  keyError.value = ''
+  if (query.value.trim()) search()
+}
+
+async function saveApiKey() {
+  const key = apiKey.value.trim()
+  if (!key) return
+  savingKey.value = true
+  keyError.value = ''
+  try {
+    const job = await run(`config set ${quoteArg(CURSEFORGE_API_KEY)} ${quoteArg(key)}`)
+    const done = await waitForJob(job.id)
+    if (done.status !== 'SUCCEEDED') {
+      keyError.value = done.output?.trim() || 'Failed to save the API key.'
+      return
+    }
+    apiKey.value = ''
+    await load()
+    if (needsApiKey.value) {
+      keyError.value = 'The API key was saved, but CurseForge is still not enabled.'
+    } else if (query.value.trim()) {
+      await search()
+    }
+  } catch (e) {
+    keyError.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    savingKey.value = false
+  }
+}
 
 async function search() {
-  if (!query.value.trim()) return
+  if (!query.value.trim() || !platform.value || needsApiKey.value || catalog.value) return
   searching.value = true
   searchError.value = ''
   try {
-    results.value = await api.searchMods(profile.value, currentType.value, query.value.trim())
+    results.value = await api.searchMods(profile.value, currentType.value, query.value.trim(), platform.value.name)
   } catch (e) {
     searchError.value = e instanceof Error ? e.message : String(e)
   } finally {
@@ -195,7 +257,10 @@ async function search() {
 
 async function install(mod: RemoteMod) {
   const worldOption = needsWorld.value && world.value ? ` --world ${quoteArg(world.value)}` : ''
-  const job = await run(`mod add ${quoteArg(currentType.value)} ${quoteArg(mod.id)} ${quoteArg(profile.value)}${worldOption}`)
+  const platformOption = platform.value ? ` --platform ${quoteArg(platform.value.name)}` : ''
+  const job = await run(
+    `mod add ${quoteArg(currentType.value)} ${quoteArg(mod.id)} ${quoteArg(profile.value)}${worldOption}${platformOption}`,
+  )
   installJobs.value[mod.id] = job.id
   await waitForJob(job.id)
 }
@@ -253,7 +318,7 @@ const installStatus = (id: string) => {
           <template v-if="filter">Nothing matches “{{ filter }}”.</template>
           <template v-else>
             No {{ typeName(currentType).toLowerCase() }} installed.<br />
-            Drag .jar or .zip files here, or download them from Modrinth.
+            Drag .jar or .zip files here, or download them from {{ platformName }}.
           </template>
         </div>
         <div v-else class="list">
@@ -272,16 +337,46 @@ const installStatus = (id: string) => {
       </section>
 
       <aside class="card search">
-        <h3>Download from Modrinth</h3>
-        <form class="row" @submit.prevent="search">
-          <input v-model="query" class="filter" :placeholder="`Search ${typeName(currentType).toLowerCase()}…`" />
-          <button type="submit" :disabled="searching || !query.trim()">Search</button>
+        <h3>Download from {{ platformName }}</h3>
+        <div v-if="platforms.length > 1" class="platforms" role="tablist" aria-label="Mod platform">
+          <button
+            v-for="p in platforms"
+            :key="p.name"
+            type="button"
+            role="tab"
+            :aria-selected="p.name === platform?.name"
+            :class="{ active: p.name === platform?.name }"
+            :title="p.enabled ? modPlatformName(p.name) : `${modPlatformName(p.name)} (not configured)`"
+            @click="selectPlatform(p.name)"
+          >
+            <img v-if="modPlatformLogo(p.name)" :src="modPlatformLogo(p.name)!" alt="" class="platform-logo" />
+            {{ modPlatformName(p.name) }}
+          </button>
+        </div>
+        <form v-if="needsApiKey" class="api-key" @submit.prevent="saveApiKey">
+          <p class="small">
+            CurseForge needs an API token,
+            <a :href="CURSEFORGE_TOKEN_URL" target="_blank" rel="noopener noreferrer">generate one</a>
+            and paste it here.
+          </p>
+          <div class="row">
+            <input v-model="apiKey" class="filter" type="password" autocomplete="off" placeholder="CurseForge API token" />
+            <button type="submit" class="primary" :disabled="savingKey || !apiKey.trim()">{{ savingKey ? 'Saving…' : 'Save' }}</button>
+          </div>
+          <div v-if="keyError" class="error">{{ keyError }}</div>
         </form>
-        <p class="muted small">Only shows {{ typeName(currentType).toLowerCase() }} compatible with {{ profile }}.</p>
+        <form v-else class="row search-form" @submit.prevent="search">
+          <input
+            v-model="query"
+            class="filter"
+            :placeholder="`${catalog ? 'Filter' : 'Search'} ${typeName(currentType).toLowerCase()}…`"
+          />
+          <button v-if="!catalog" type="submit" :disabled="searching || !query.trim()">Search</button>
+        </form>
         <div v-if="searchError" class="error">{{ searchError }}</div>
         <div v-if="searching" class="muted">Searching…</div>
-        <div v-for="mod in results" :key="mod.id" class="result">
-          <ModLogo :src="mod.iconUrl" :name="mod.name" :size="36" />
+        <div v-for="mod in shownResults" :key="mod.id" class="result">
+          <ModLogo :src="remoteModIcon(platform?.name ?? '', mod)" :name="mod.name" :size="36" />
           <div class="info">
             <strong>{{ mod.name }}</strong>
             <div class="muted small description">{{ mod.description }}</div>
@@ -391,6 +486,42 @@ const installStatus = (id: string) => {
 
 .search h3 {
   margin: 0 0 0.75rem;
+}
+
+.platforms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.platforms button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.platforms button.active {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.platform-logo {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+
+.search-form {
+  margin-bottom: 0.5rem;
+}
+
+.api-key p {
+  margin: 0 0 0.5rem;
+}
+
+.api-key .row {
+  margin-bottom: 0.5rem;
 }
 
 .small {

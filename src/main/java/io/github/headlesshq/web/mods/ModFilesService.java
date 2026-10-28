@@ -12,6 +12,8 @@ import io.github.headlesshq.headlessmc.mods.distribution.RemoteMod;
 import io.github.headlesshq.headlessmc.platform.Platform;
 import io.github.headlesshq.headlessmc.platform.PlatformService;
 import io.github.headlesshq.headlessmc.platform.mods.ModSupport;
+import io.github.headlesshq.web.mods.icon.CurseForgeIconService;
+import io.github.headlesshq.web.mods.icon.GitHubIconService;
 import io.github.headlesshq.web.mods.icon.ModrinthIconService;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -46,12 +48,15 @@ public class ModFilesService {
 
     private static final Logger LOG = Logger.getLogger(ModFilesService.class);
     private static final Set<String> EXTENSIONS = Set.of(".jar", ".zip");
-    private static final String MODRINTH = "modrinth";
+    private static final String GITHUB = "github";
+    private static final List<String> PLATFORM_ORDER = List.of("modrinth", "curseforge", GITHUB);
 
     private final Map<String, CachedInfo> infoCache = new ConcurrentHashMap<>();
     private final ModDistributionPlatformService distributionService;
     private final ModListingService modListingService;
     private final ModrinthIconService modrinthIcons;
+    private final CurseForgeIconService curseForgeIcons;
+    private final GitHubIconService gitHubIcons;
     private final PlatformService platformService;
     private final ProfileService profileService;
     private final ServerService serverService;
@@ -61,6 +66,8 @@ public class ModFilesService {
         ModDistributionPlatformService distributionService,
         ModListingService modListingService,
         ModrinthIconService modrinthIcons,
+        CurseForgeIconService curseForgeIcons,
+        GitHubIconService gitHubIcons,
         PlatformService platformService,
         ProfileService profileService,
         ServerService serverService
@@ -68,6 +75,8 @@ public class ModFilesService {
         this.distributionService = distributionService;
         this.modListingService = modListingService;
         this.modrinthIcons = modrinthIcons;
+        this.curseForgeIcons = curseForgeIcons;
+        this.gitHubIcons = gitHubIcons;
         this.platformService = platformService;
         this.profileService = profileService;
         this.serverService = serverService;
@@ -227,12 +236,39 @@ public class ModFilesService {
         return describe(profile, location.type(), target, location.world(), List.of());
     }
 
+    /**
+     * @param profile the profile to find mods for.
+     * @param type    the type of mods to find.
+     * @return the mod distribution platforms that can be searched, in the order in which they are offered.
+     */
+    public List<ModPlatformDto> platforms(Profile profile, ModType type) {
+        return distributionService.platforms()
+            .sorted(Comparator.comparingInt((ModDistributionPlatform platform) -> {
+                int index = PLATFORM_ORDER.indexOf(platform.getName().toLowerCase(Locale.ROOT));
+                return index < 0 ? PLATFORM_ORDER.size() : index;
+            }).thenComparing(ModDistributionPlatform::getName))
+            .map(platform -> {
+                String name = platform.getName().toLowerCase(Locale.ROOT);
+                List<RemoteModDto> mods = GITHUB.equals(name) ? search(profile, type, "", name) : null;
+                return new ModPlatformDto(name, platform.isEnabled(), mods);
+            })
+            .toList();
+    }
+
     public List<RemoteModDto> search(Profile profile, ModType type, String query, @Nullable String platform) {
         ModDistributionPlatform distribution = distributionService.getByArg(platform);
-        List<RemoteMod> mods = distribution.search(query, profile.version(), Set.of(type));
-        Map<String, String> icons = MODRINTH.equalsIgnoreCase(distribution.getName())
-            ? modrinthIcons.getIcons(mods.stream().map(RemoteMod::id).toList())
-            : Map.of();
+        if (!distribution.isEnabled()) {
+            throw new IllegalArgumentException("The mod distribution platform " + distribution.getName() + " is not configured");
+        }
+
+        List<RemoteMod> mods = distribution.search(query, profile.version(), type);
+        List<String> ids = mods.stream().map(RemoteMod::id).toList();
+        Map<String, String> icons = switch (distribution.getName().toLowerCase(Locale.ROOT)) {
+            case "modrinth" -> modrinthIcons.getIcons(ids);
+            case "curseforge" -> curseForgeIcons.getIcons(ids, type, query, profile.version().version());
+            case GITHUB -> gitHubIcons.getIcons(ids);
+            default -> Map.of();
+        };
         return mods.stream().map(mod -> RemoteModDto.of(mod, icons.get(mod.id()))).toList();
     }
 
