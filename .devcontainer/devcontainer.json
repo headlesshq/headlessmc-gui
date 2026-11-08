@@ -1,0 +1,51 @@
+{
+  "name": "headlessmc-gui",
+  "image": "mcr.microsoft.com/devcontainers/base:bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/java:1": {
+      "version": "25",
+      "jdkDistro": "tem",
+      "installGradle": false
+    },
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "24"
+    }
+  },
+  "hostRequirements": {
+    "cpus": 2,
+    "memory": "8gb"
+  },
+  "mounts": [
+    "source=headlessmc-gui-gradle,target=/home/vscode/.gradle,type=volume",
+    "source=headlessmc-gui-node-modules,target=${containerWorkspaceFolder}/src/main/webui/node_modules,type=volume"
+  ],
+  // Set DEVCONTAINER_USER=root when using rootless Docker.
+  "remoteUser": "${localEnv:DEVCONTAINER_USER:vscode}",
+  "containerEnv": {
+    "GRADLE_USER_HOME": "/home/vscode/.gradle",
+    "GRAALVM_HOME": "/opt/graalvm-25"
+  },
+  "remoteEnv": {
+    "PATH": "${containerEnv:PATH}:/opt/graalvm-25/bin"
+  },
+  "forwardPorts": [8080, 5173],
+  "portsAttributes": {
+    "8080": {
+      "label": "Quarkus (quarkusDev, web UI)"
+    },
+    "5173": {
+      "label": "Vite dev server (npm run dev)"
+    }
+  },
+  "onCreateCommand": "bash .devcontainer/on-create.sh",
+  "postCreateCommand": "git submodule update --init --recursive && ./gradlew --version && (cd src/main/webui && npm ci)",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "vscjava.vscode-java-pack",
+        "vscjava.vscode-gradle",
+        "Vue.volar"
+      ]
+    }
+  }
+}
