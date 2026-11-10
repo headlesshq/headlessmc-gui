@@ -1,6 +1,8 @@
 {
   "name": "headlessmc-gui",
-  "image": "mcr.microsoft.com/devcontainers/base:bookworm",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
   "features": {
     "ghcr.io/devcontainers/features/java:1": {
       "version": "25",
@@ -37,7 +39,7 @@
       "label": "Vite dev server (npm run dev)"
     }
   },
-  "onCreateCommand": "bash .devcontainer/on-create.sh",
+  "onCreateCommand": "sudo chown \"$(id -u):$(id -g)\" \"$GRADLE_USER_HOME\" src/main/webui/node_modules",
   "postCreateCommand": "git submodule update --init --recursive && ./gradlew --version && (cd src/main/webui && npm ci)",
   "customizations": {
     "vscode": {
